@@ -1219,13 +1219,11 @@
             },
             "rimLight": {
               "__type__": "cc.Color",
-              "r": 0,
+              "r": 255,
               "g": 255,
-              "b": 214,
+              "b": 0,
               "a": 255
-            },
-            "rimLightW": 2,
-            "rimLightStrength": 1.5
+            }
           },
           {},
           {},
