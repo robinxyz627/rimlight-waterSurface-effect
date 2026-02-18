@@ -1,0 +1,66 @@
+CCEffect %{
+  techniques:
+  - name: opaque
+    passes:
+    - vert: legacy/main-functions/general-vs:vert # builtin header
+      frag: unlit-fs:frag
+      properties: &props
+        mainTexture:    { value: white }
+        mainColor:      { value: [1, 1, 1, 1], editor: { type: color } }
+        reflectTexture: { value: white }
+        reflectCoef:    { value: 0.5, editor: { slider: true, range: [0, 1],step: 0.01 } }
+        fresnelPow:     { value: 1, editor: { slider: true, range: [1, 5],step: 1 } }
+        noiseTexture:   { value: white }
+  - name: transparent
+    passes:
+    - vert: general-vs:vert # builtin header
+      frag: unlit-fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      properties: *props
+}%
+
+CCProgram unlit-fs %{
+  precision highp float;
+  #include <legacy/output>
+  #include <legacy/fog-fs>
+
+  in vec2 v_uv;
+  in vec3 v_position;
+  in vec3 v_normal;
+
+  uniform sampler2D mainTexture;
+  uniform samplerCube reflectTexture;
+  uniform sampler2D noiseTexture;
+
+  uniform Constant {
+    vec4 mainColor;
+    float reflectCoef;
+    float fresnelPow;
+  };
+
+  vec4 frag () {
+    // sample noise texture and add random
+    float T = texture(noiseTexture, v_uv + v_position.xz * 0.1 + cc_time.x * 0.05).r;
+    // normalize the normal vector
+    vec3 N = normalize(v_normal);
+    vec3 viewDir = normalize(v_position - cc_cameraPos.xyz);
+    // vec3 reflectDir = reflect(viewDir, N);
+    vec3 reflectDir = (viewDir - 2.0 * dot(viewDir, N) * N) + T * 0.3;
+    vec4 reflectColor = texture(reflectTexture, reflectDir);
+    // sample fresnel coefficient
+    float fresnel = pow(1.0 - dot(N,-viewDir), fresnelPow);
+
+    vec4 col = mainColor * texture(mainTexture, v_uv);
+    col.rgb = mix(col.rgb, reflectColor.rgb, reflectCoef * fresnel);
+
+    col.rgb = mix(col.rgb, vec3(1.0), smoothstep(0.91, 0.911, T));
+    CC_APPLY_FOG(col, v_position);
+    return CCFragOutput(col);
+  }
+}%
