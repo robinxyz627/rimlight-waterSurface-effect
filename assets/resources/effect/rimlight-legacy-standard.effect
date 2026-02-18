@@ -26,7 +26,7 @@ CCEffect %{
         emissiveMap:          { value: grey }
         rimLight:             { value: [1.0, 1.0, 1.0, 1.0], target: rimColor, editor: { displayName: RimLight, type: color } }
         rimLightW:            { value: 1.0, target: rimColor.w, editor: {slide: true, range: [1.0, 10.0], step: 0.5 } }
-        rimLightStrength:     { value: 1.0, editor: {slide: true, range: [1.0, 10.0], step: 0.5 } }
+        rimLightStrength:     { value: 1.0, editor: {slide: true, range: [1.0, 10.0], step: 0.1 } }
     - &forward-add
       vert: standard-vs
       frag: standard-fs
@@ -179,10 +179,13 @@ CCProgram standard-vs %{
     vec4 pos = matWorld * In.position;
 
     v_position = pos.xyz;
+    // vec4 n = vec4(In.normal, 0.0);
     // 计算模型世界空间法线方向
-    v_normal = normalize((matWorldIT * vec4(In.normal, 0.0)).xyz);
+    vec3 worldNormal = normalize((matWorldIT * vec4(In.normal, 0.0)).xyz);
+    v_normal = worldNormal;
     // 计算模型视图空间法线方向
-    v_view_normal = normalize(((cc_matView * matWorldIT) * vec4(In.normal, 0.0)).xyz);
+    v_view_normal = normalize((cc_matView * vec4(worldNormal, 0.0)).xyz);
+    // v_view_normal = normalize(((cc_matView * matWorldIT) * n).xyz);
 
     #if CC_RECEIVE_SHADOW
       v_shadowBiasAndProbeId.xy = CCGetShadowBias();
@@ -312,10 +315,10 @@ CCProgram standard-fs %{
     s.albedo = baseColor;
     s.albedo.rgb *= albedoScaleAndCutoff.xyz;
     // 视图空间摄像机位于(0,0,0)，摄像机的朝向是 Z 轴正方向 (0,0,1)
-    float CoefRim = 1.0 - dot(normalize(v_view_normal), vec3(0.0, 0.0, 1.0));
+    float CoefRim = (1.0 - dot(v_view_normal, vec3(0.0, 0.0, 1.0)));
     CoefRim = pow(CoefRim, rimLightStrength);
     // 线性插值0取s.albedo.rgb，1取rimColor.rgb * rimColor.w，插值系数为CoefRim
-    s.albedo.rgb = mix(s.albedo.rgb, rimColor.xyz * rimColor.w, CoefRim);
+    s.albedo.rgb = mix(s.albedo.rgb, rimColor.rgb * rimColor.w, CoefRim);
 
     #if USE_ALPHA_TEST
       if (s.albedo.ALPHA_TEST_CHANNEL < albedoScaleAndCutoff.w) discard;
